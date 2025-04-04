@@ -83,7 +83,7 @@ class DataIngestion:
             self.split_data_as_train_test(dataframe=dataframe)
 
             dataingestionartifact = DataIngestionArtifact(
-                train_file_path=self.data_ingestion_config.training_file_path,
+                trained_file_path=self.data_ingestion_config.training_file_path,
                 test_file_path=self.data_ingestion_config.testing_file_path,
             )
 
