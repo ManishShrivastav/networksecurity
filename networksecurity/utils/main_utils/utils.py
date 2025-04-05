@@ -1,3 +1,5 @@
+from sklearn.metrics import r2_score
+from sklearn.model_selection import GridSearchCV
 import yaml
 from networksecurity.exception.exception import NetworkSecurityException
 from networksecurity.logging.logger import logging
@@ -14,6 +16,7 @@ def read_yaml_file(file_path: str) -> dict:
     except Exception as e:
         raise NetworkSecurityException(e, sys)
     
+    
 def convert_np_types(obj):
     """Recursively convert numpy data types to native Python types."""
     if isinstance(obj, np.generic):  # This handles np.float64, np.int64, etc.
@@ -24,6 +27,7 @@ def convert_np_types(obj):
         return [convert_np_types(item) for item in obj]
     else:
         return obj  # If it's neither a dict nor a list, return it as-is
+    
 
 def write_yaml_file(file_path: str, content: object, replace: bool = False) -> None:
     try:
@@ -50,6 +54,7 @@ def save_numpy_array_data(file_path: str, array: np.ndarray):
     except Exception as e:
         raise NetworkSecurityException(e, sys)
     
+    
 def save_object(file_path: str, obj: object) -> None:
     """Save an object to a file using pickle."""
     try:
@@ -60,3 +65,60 @@ def save_object(file_path: str, obj: object) -> None:
         logging.info("Exited the save_object method of Main-Utils class")
     except Exception as e:
         raise NetworkSecurityException(e, sys)
+    
+
+def load_object(file_path: str) -> object:
+    try:
+        if not os.path.exists(file_path):
+            raise Exception(f"The file: {file_path} does not exists.")
+        with open(file_path, 'rb') as file_obj:
+            print(file_obj)
+            return pickle.load(file_obj)
+    except Exception as e:
+        raise NetworkSecurityException(e, sys)
+    
+
+def load_numpy_array_data(file_path: str) -> np.array:
+    """
+    load numpy array data from file
+    file_path: str location of file to load 
+    return: np.array data loaded
+    """
+    try:
+        with open(file_path, 'rb') as file_obj:
+            return np.load(file_obj)
+    except Exception as e:
+        raise NetworkSecurityException(e, sys)
+
+
+def evaluate_models(X_train, y_train, X_test, y_test, models, param):
+    try:
+        report = {}
+
+        for i in range(len(list(models))):
+            model = list(models.values())[i]
+            para = param[list(models.keys())[i]]
+
+            gs = GridSearchCV(model, para, cv=3)
+            gs.fit(X_train, y_train)
+
+            model.set_params(**gs.best_params_)
+            model.fit(X_train, y_train)
+
+            # model.fit(X_train, y_train) # train model
+
+            y_train_pred = model.predict(X_train)
+            y_test_pred = model.predict(X_test)
+
+            train_model_score = r2_score(y_train, y_train_pred)
+            test_model_score = r2_score(y_test, y_test_pred)
+
+            report[list(models.keys())[i]] = test_model_score
+        
+        return report
+    except Exception as e:
+        raise NetworkSecurityException(e, sys)
+
+
+
+
