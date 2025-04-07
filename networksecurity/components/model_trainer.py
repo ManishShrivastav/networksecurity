@@ -23,6 +23,8 @@ from sklearn.ensemble import (
     GradientBoostingClassifier,
     RandomForestClassifier,
 )
+import mlflow
+from urllib.parse import urlparse
 
 class ModelTrainer:
     def __init__(self, model_trainer_config: ModelTrainerConfig,
@@ -32,7 +34,32 @@ class ModelTrainer:
             self.model_trainer_config = model_trainer_config
             self.data_transformation_artifact = data_transformation_artifact
         except Exception as e:
-            NetworkSecurityException(e, sys)
+            raise NetworkSecurityException(e, sys)
+
+    def track_mlflow(self, best_model, classificationmetric):
+        mlflow.set_registry_uri("https://dagshub.com/krishnaik06/networksecurity.mlflow")
+        tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
+        with mlflow.start_run():
+            f1_score = classificationmetric.f1_score
+            precision_score = classificationmetric.precision_score
+            recall_score = classificationmetric.recall_score
+
+            mlflow.log_metrics({"f1_score": f1_score,
+                                "precision_score": precision_score,
+                                "recall_score": recall_score})
+            mlflow.sklearn.log_model(best_model, "model")
+            # Model registry does not work with file store
+            if tracking_url_type_store != "file":
+
+                # Register the model
+                # There are other ways to use the Model Registry, which depends on the use case,
+                # please refer to the doc for more information:
+                # https://mlflow.org/docs/latest/model-registry.html#api-workflow
+                mlflow.sklearn.log_model(best_model, "model", registered_model_name=best_model)
+            else:
+                mlflow.sklearn.log_model(best_model, "model")
+
+
 
 
     def train_model(self, X_train, y_train, X_test, y_test):
@@ -86,10 +113,13 @@ class ModelTrainer:
 
         classification_train_metric = get_classification_score(y_true=y_train, y_pred=y_train_pred)
 
-        ## TODO: Function to track the mlflow
+        ## Function to track the experiments with mlflow
+        self.track_mlflow(best_model, classification_train_metric)
 
         y_test_pred = best_model.predict(X_test)
         classification_test_metric = get_classification_score(y_true=y_test, y_pred=y_test_pred)
+
+        self.track_mlflow(best_model, classification_test_metric)
 
         preprocessor = load_object(file_path=self.data_transformation_artifact.transformed_object_file_path)
 
@@ -97,7 +127,16 @@ class ModelTrainer:
         os.makedirs(model_dir_path, exist_ok=True)
 
         Network_Model = NetworkModel(preprocessor=preprocessor, model=best_model)
-        save_object(self.model_trainer_config.trained_model_file_path, obj=NetworkModel)
+        logging.info(f"Saving model at: {self.model_trainer_config.trained_model_file_path}")
+        save_object(self.model_trainer_config.trained_model_file_path, obj=Network_Model)
+        logging.info(f"Model successfully saved at: {self.model_trainer_config.trained_model_file_path}")
+
+        if not os.path.exists(self.model_trainer_config.trained_model_file_path):
+            logging.warning("Model file was not saved correctly!")
+        else:
+            logging.info("Model file exists!")
+
+
 
         ## Model Trainer Artifact
         model_trainer_artifact = ModelTrainerArtifact(trained_model_file_path=self.model_trainer_config.trained_model_file_path,
@@ -126,10 +165,10 @@ class ModelTrainer:
                 test_arr[:,-1],
             )
 
-            model = self.train_model(x_train, y_train, x_test, y_test)
+            model_trainer_artifact = self.train_model(x_train, y_train, x_test, y_test)
 
-            return model
+            return model_trainer_artifact
 
         except Exception as e:
-            NetworkSecurityException(e, sys)
+            raise NetworkSecurityException(e, sys)
         
