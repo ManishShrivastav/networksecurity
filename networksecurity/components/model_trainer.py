@@ -25,6 +25,9 @@ from sklearn.ensemble import (
 )
 import mlflow
 from urllib.parse import urlparse
+import dagshub
+dagshub.init(repo_owner='ManishShrivastav', repo_name='networksecurity', mlflow=True)
+
 
 class ModelTrainer:
     def __init__(self, model_trainer_config: ModelTrainerConfig,
@@ -37,7 +40,7 @@ class ModelTrainer:
             raise NetworkSecurityException(e, sys)
 
     def track_mlflow(self, best_model, classificationmetric):
-        mlflow.set_registry_uri("https://dagshub.com/krishnaik06/networksecurity.mlflow")
+        mlflow.set_registry_uri("https://dagshub.com/ManishShrivastav/networksecurity.mlflow")
         tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
         with mlflow.start_run():
             f1_score = classificationmetric.f1_score
@@ -55,7 +58,8 @@ class ModelTrainer:
                 # There are other ways to use the Model Registry, which depends on the use case,
                 # please refer to the doc for more information:
                 # https://mlflow.org/docs/latest/model-registry.html#api-workflow
-                mlflow.sklearn.log_model(best_model, "model", registered_model_name=best_model)
+                mlflow.sklearn.log_model(best_model, "model")
+
             else:
                 mlflow.sklearn.log_model(best_model, "model")
 
@@ -130,6 +134,7 @@ class ModelTrainer:
         logging.info(f"Saving model at: {self.model_trainer_config.trained_model_file_path}")
         save_object(self.model_trainer_config.trained_model_file_path, obj=Network_Model)
         logging.info(f"Model successfully saved at: {self.model_trainer_config.trained_model_file_path}")
+        save_object("final_model/model.pkl", best_model)
 
         if not os.path.exists(self.model_trainer_config.trained_model_file_path):
             logging.warning("Model file was not saved correctly!")
